@@ -49,6 +49,13 @@ boolean sentFrame = false;
 // Not yet stored into the S/W buffer
 boolean receivedFrame = false;
 
+// getValue for test
+char deviceIdBuffer[40];
+char deviceIdentifierBuffer[40];
+char extendedUniqueIdentifierBuffer[40];
+char NetworkIdAndShortAddressBuffer[40];
+char deviceModeBuffer[40];
+
 void updateState(int nextState) {
   state = nextState;
   lastStateChange = millis();
@@ -84,13 +91,23 @@ void setupDW1000() {
   DW1000.setDefaults();
   DW1000.setNetworkId(networkId);
   DW1000.setDeviceAddress(anchorId);
-  DW1000.setDataRate(TRX_RATE_6800KBPS);
-  DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_ACCURACY);
-  DW1000.setPulseFrequency(TX_PULSE_FREQ_16MHZ);
-  DW1000.setPreambleLength(TX_PREAMBLE_LEN_128);
-  DW1000.setChannel(1);
-  DW1000.setPreambleCode(2);
+  DW1000.enableMode(DW1000.MODE_SHORTDATA_FAST_LOWPOWER);
+  DW1000.setChannel(DW1000.CHANNEL_1);
+  DW1000.setPreambleCode(DW1000.PREAMBLE_CODE_16MHZ_2);
+  DW1000.enableLedBlinking();
   DW1000.commitConfiguration();
+
+  // test
+  PRINTLN(F("start test"));
+  DW1000.getPrintableDeviceIdentifier(deviceIdBuffer);
+  PRINTLN(deviceIdBuffer);
+  DW1000.getPrintableExtendedUniqueIdentifier(extendedUniqueIdentifierBuffer);
+  PRINTLN(extendedUniqueIdentifierBuffer);
+  DW1000.getPrintableNetworkIdAndShortAddress(NetworkIdAndShortAddressBuffer);
+  PRINTLN(NetworkIdAndShortAddressBuffer);
+  DW1000.getPrintableDeviceMode(deviceModeBuffer);
+  PRINTLN(deviceModeBuffer);
+
   DW1000.attachSentHandler(spiSendEvent);
   DW1000.attachReceivedHandler(spiReceiveEvent);
 
@@ -141,11 +158,13 @@ void transmitRangeReport() {
  * Main *
  ********/
 void setup() {
-  setupDW1000();
-#if DEBUG
+  #if DEBUG
   Serial.begin(115200);
-#endif // DEBUG
-  PRINTLN(F("Setup finished"));
+  #endif // DEBUG
+
+  setupDW1000();
+
+  PRINTLN(F("Setup 1111  finished"));
   PRINTLN(F("=============="));
   randomSeed(analogRead(0));
 }
@@ -172,7 +191,7 @@ void loop() {
     updateState(STATE_IDLE);
     return;
   }
-  // Arduino didn't capture SIP tx/rx interrupts for more than RESET_TIMEOUT_MS
+  // Arduino didn't capture SPI tx/rx interrupts for more than RESET_TIMEOUT_MS
   if (!sentFrame && !receivedFrame && curMillis - lastActivity > RESET_TIMEOUT_MS) {
     PRINTLN(F("Seems transceiver not working. Re-init it."));
     initDW1000Receiver();
