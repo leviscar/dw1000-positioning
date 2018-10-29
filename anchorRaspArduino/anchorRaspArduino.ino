@@ -164,7 +164,7 @@ void setup() {
 
   setupDW1000();
 
-  PRINTLN(F("Setup 1111  finished"));
+  PRINTLN(F("Setup finished"));
   PRINTLN(F("=============="));
   randomSeed(analogRead(0));
 }
