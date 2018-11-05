@@ -82,7 +82,7 @@ static dwt_config_t config = {
 uint16 Acaddrtable[QUANTITY_ANCHOR]={0x01,0x02,0x03,0x04,0x05};
 sys_config_t sys_config = {
 	.rangingtype=0,	/* 0 --> TOA , 1 --> TDOA */
-	.timebase=1,	/* 1 --> use timebase */
+	.timebase=0,	/* 1 --> use timebase */
 	.mpu_use=0,		/* 1 --> use mpu */
 	.pmpudata=NULL,
 	.mpudatacnt=200,//200*float
@@ -215,18 +215,18 @@ int main(void)
 //	IWDG_Feed();
 	tim14_int=0;
 	
-	while(1)
-	{
-		dwt_setrxtimeout(0);
-		dwt_rxenable(DWT_START_RX_IMMEDIATE);	
-		while(!isframe_rec){};
-		isframe_rec=0;
-		if(rx_buffer[FUNCODE_IDX]==0x80)
-		{
-			printf("rec \r\n");
-		}
-		rx_buffer[FUNCODE_IDX]=0;
-	}
+//	while(1)
+//	{
+//		dwt_setrxtimeout(0);
+//		dwt_rxenable(DWT_START_RX_IMMEDIATE);	
+//		while(!isframe_rec){};
+//		isframe_rec=0;
+//		if(rx_buffer[FUNCODE_IDX]==0x80)
+//		{
+//			printf("rec \r\n");
+//		}
+//		rx_buffer[FUNCODE_IDX]=0;
+//	}
 
 	while(1)
 	{

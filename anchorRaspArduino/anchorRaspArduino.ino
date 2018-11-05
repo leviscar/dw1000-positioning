@@ -6,6 +6,7 @@
 
 #include "debug.h"
 #include "def.h"
+#include "i2c.h"
 #include "arduino.h"
 
 #define PIN_IRQ  2
@@ -64,6 +65,72 @@ void updateState(int nextState) {
 void noteActivity() {
   lastActivity = millis();
 }
+
+/***********************************************
+ * I2C Raspberry Pi (master) - Arduino (slave) *
+ ***********************************************/
+// Raspberry Pi first writes and Arduino reads data
+// void i2cReceiveEvent(int bytes) {
+//   if (!bytes) {
+//     return;
+//   }
+//   // Although Raspberry PI sends 1-byte long data via I2C interface,
+//   // It is safe to read bytes as many as Arduino can until there is no data remained
+//   while (Wire.available()) {
+//     cmd = Wire.read();
+//   }
+//   if (cmd == CMD_SCAN && state == STATE_IDLE) {
+//     PRINTLN(F("Start anchor..."));
+//     updateState(STATE_SCAN);
+//     return;
+//   }
+//   // Raspberry Pi requests data representing whether data is ready
+//   if (cmd == CMD_DATA_READY) {
+//     type = TYPE_DATA_READY;
+//     return;
+//   }
+//   // Raspberry Pi requests data representing anchors' IDs
+//   if (cmd == CMD_TYPE_ID) {
+//     type = TYPE_ID;
+//     return;
+//   }
+//   // Raspberry Pi requests data representing distance measurements
+//   if (cmd == CMD_TYPE_DIST) {
+//     type = TYPE_DIST;
+//     return;
+//   }
+// }
+
+// // And then Arduino writes and Raspberry Pi reads data
+// void i2cRequestEvent() {
+//   if (state != STATE_IDLE || type == TYPE_NONE) {
+//     Wire.write(I2C_NODATA);
+//     return;
+//   }
+//   if (type == TYPE_DATA_READY) {
+//     Wire.write(I2C_DATARD);
+//     return;
+//   }
+//   // HACK: Regard array of anchors' IDs and distance measurements as a long binay data
+//   // Note that Arduino uses little endian
+//   if (type == TYPE_ID) {
+//     Wire.write((byte*)anchorId, 2 * NUM_ANCHORS);
+//     return;
+//   }
+//   if (type == TYPE_DIST) {
+//     Wire.write((byte*)distance, 4 * NUM_ANCHORS);
+//     return;
+//   }
+// }
+
+// void setupI2C() {
+//   // 7-bit addressing
+//   // ref: table 3, page 17, http://www.nxp.com/docs/en/user-guide/UM10204.pdf
+//   Wire.begin(I2CSLAVEADDR);
+//   Wire.onRequest(i2cRequestEvent);
+//   Wire.onReceive(i2cReceiveEvent);
+//   type = TYPE_NONE;
+// }
 
 /*************************************
  * Arduino (master) - DW1000 (slave) *
@@ -136,7 +203,7 @@ void transmitPong() {
 
 void transmitPollAck() {
   prepareTx();
-  txBuffer[0] = FTYPE_POLLACK;
+  txBuffer[9] = TOA_POLLACK;
   SET_SRC(txBuffer, anchorId, ADDR_SIZE);
   SET_DST(txBuffer, tagCounterPart, ADDR_SIZE);
   DW1000.setDelay(reply_delay);
@@ -145,7 +212,7 @@ void transmitPollAck() {
 
 void transmitRangeReport() {
   prepareTx();
-  txBuffer[0] = FTYPE_RANGEREPORT;
+  txBuffer[9] = TOA_RANGEACK;
   SET_SRC(txBuffer, anchorId, ADDR_SIZE);
   SET_DST(txBuffer, tagCounterPart, ADDR_SIZE);
   timePollReceived.getTimestamp(txBuffer + 5);
@@ -161,7 +228,8 @@ void setup() {
   #if DEBUG
   Serial.begin(115200);
   #endif // DEBUG
-
+  
+  // setupI2C();
   setupDW1000();
 
   PRINTLN(F("Setup finished"));
@@ -213,12 +281,12 @@ void loop() {
       return;
     }
 
-    if (txBuffer[0] == FTYPE_POLLACK) {
+    if (txBuffer[9] == TOA_POLLACK) {
       PRINTLN(F("  POLLACK sent. Getting timestamp..."));
       DW1000.getTransmitTimestamp(timePollAckSent);
     }
 
-    if (txBuffer[0] == FTYPE_RANGEREPORT) {
+    if (txBuffer[9] == TOA_RANGEACK) {
       PRINTLN(F("  RANGEREPORT sent"));
     }
   }
@@ -233,26 +301,23 @@ void loop() {
     DW1000.getData(rxBuffer, FRAME_LEN);
     GET_SRC(rxBuffer, sender, ADDR_SIZE);
 
+    PRINTLN(rxBuffer[0]);
+    PRINTLN(rxBuffer[9]);
+
+    if(state == STATE_IDLE){
+      if(rxBuffer[0] == TOATYPE_START){
+        PRINTLN(F(" received toa"));
+      }
+    }
+
     if (state == STATE_IDLE) {
       PRINTLN(F("  State: IDLE"));
-      if (rxBuffer[0] == FTYPE_PING) {
-        PRINTLN(F("    Received PING. Reply with PONG"));
-      /*
-       * Simple random backoff [0, PONG_TIMEOUT_MS - 10) milliseconds
-       */
-        int d = random(0, PONG_TIMEOUT_MS - 10);
-        PRINT(F("    PONG delayed ")); PRINT(d); PRINTLN(F(" ms"));
-        delay(d);
-        transmitPong();
-        updateState(STATE_PENDING_PONG);
-        return;
-      }
-      if (rxBuffer[0] == FTYPE_POLL) {
+      if (rxBuffer[9] == TOA_POLL) {
         PRINTLN(F("    Received POLL"));
-        if (!DOES_DST_MATCH(rxBuffer, anchorId, ADDR_SIZE)) {
-          PRINTLN(F("      Not for me"));
-          return;
-        }
+        // if (!DOES_DST_MATCH(rxBuffer, anchorId, ADDR_SIZE)) {
+        //   PRINTLN(F("      Not for me"));
+        //   return;
+        // }
         PRINTLN(F("      Reply with POLLACK"));
         DW1000.getReceiveTimestamp(timePollReceived);
         tagCounterPart = sender;
@@ -262,26 +327,16 @@ void loop() {
       }
     }
 
-    if (state == STATE_PENDING_PONG) {
-      PRINTLN(F("  State: PENDING_PONG"));
-      PRINTLN(F("    Ignore all received frames"));
-      /*
-       * PONG message is pending to be transmitted
-       * Anchor should ignore all other messages
-       */
-      return;
-    }
-
     if (state == STATE_RANGE) {
       PRINTLN(F("  State: RANGE"));
-      if (rxBuffer[0] != FTYPE_RANGE) {
-        PRINTLN(F("    Not RANGE"));
-        return;
-      }
-      if (!DOES_SRC_MATCH(rxBuffer, tagCounterPart, ADDR_SIZE)) {
-        PRINTLN(F("    Not from counter part"));
-        return;
-      }
+      // if (rxBuffer[0] != TOA_RANGE) {
+      //   PRINTLN(F("    Not RANGE"));
+      //   return;
+      // }
+      // if (!DOES_SRC_MATCH(rxBuffer, tagCounterPart, ADDR_SIZE)) {
+      //   PRINTLN(F("    Not from counter part"));
+      //   return;
+      // }
       PRINTLN(F("    Sending RANGEREPORT..."));
       DW1000.getReceiveTimestamp(timeRangeReceived);
       transmitRangeReport();
