@@ -17,7 +17,8 @@
 // Each anchor must have a unique anchor ID (do not use ID 0)
 const uint16_t anchorId = 1;
 // UWB anchors and tags must have the same network ID
-const uint16_t networkId = 10;
+const uint16_t networkId = 0xDECA;
+static uint8_t eui[] = {'A', 'C', 'K', 'D', 'A', 'T', 'R', 'X'};
 // Sender of the last received frame in the S/W buffer
 uint16_t sender;
 // Counter part tag during two way ranging (PING, PONNG, RANGE, RANGEREPORT)
@@ -66,72 +67,6 @@ void noteActivity() {
   lastActivity = millis();
 }
 
-/***********************************************
- * I2C Raspberry Pi (master) - Arduino (slave) *
- ***********************************************/
-// Raspberry Pi first writes and Arduino reads data
-// void i2cReceiveEvent(int bytes) {
-//   if (!bytes) {
-//     return;
-//   }
-//   // Although Raspberry PI sends 1-byte long data via I2C interface,
-//   // It is safe to read bytes as many as Arduino can until there is no data remained
-//   while (Wire.available()) {
-//     cmd = Wire.read();
-//   }
-//   if (cmd == CMD_SCAN && state == STATE_IDLE) {
-//     PRINTLN(F("Start anchor..."));
-//     updateState(STATE_SCAN);
-//     return;
-//   }
-//   // Raspberry Pi requests data representing whether data is ready
-//   if (cmd == CMD_DATA_READY) {
-//     type = TYPE_DATA_READY;
-//     return;
-//   }
-//   // Raspberry Pi requests data representing anchors' IDs
-//   if (cmd == CMD_TYPE_ID) {
-//     type = TYPE_ID;
-//     return;
-//   }
-//   // Raspberry Pi requests data representing distance measurements
-//   if (cmd == CMD_TYPE_DIST) {
-//     type = TYPE_DIST;
-//     return;
-//   }
-// }
-
-// // And then Arduino writes and Raspberry Pi reads data
-// void i2cRequestEvent() {
-//   if (state != STATE_IDLE || type == TYPE_NONE) {
-//     Wire.write(I2C_NODATA);
-//     return;
-//   }
-//   if (type == TYPE_DATA_READY) {
-//     Wire.write(I2C_DATARD);
-//     return;
-//   }
-//   // HACK: Regard array of anchors' IDs and distance measurements as a long binay data
-//   // Note that Arduino uses little endian
-//   if (type == TYPE_ID) {
-//     Wire.write((byte*)anchorId, 2 * NUM_ANCHORS);
-//     return;
-//   }
-//   if (type == TYPE_DIST) {
-//     Wire.write((byte*)distance, 4 * NUM_ANCHORS);
-//     return;
-//   }
-// }
-
-// void setupI2C() {
-//   // 7-bit addressing
-//   // ref: table 3, page 17, http://www.nxp.com/docs/en/user-guide/UM10204.pdf
-//   Wire.begin(I2CSLAVEADDR);
-//   Wire.onRequest(i2cRequestEvent);
-//   Wire.onReceive(i2cReceiveEvent);
-//   type = TYPE_NONE;
-// }
-
 /*************************************
  * Arduino (master) - DW1000 (slave) *
  *************************************/
@@ -160,6 +95,10 @@ void setupDW1000() {
   DW1000.setDeviceAddress(anchorId);
   DW1000.enableMode(DW1000.MODE_SHORTDATA_FAST_LOWPOWER);
   DW1000.setChannel(DW1000.CHANNEL_1);
+  DW1000.setEUI(eui);
+  // DW1000.setFrameFilter(true);
+  // DW1000.setFrameFilterAllowData(true);
+  // DW1000.setFrameFilterAllowAcknowledgement(true);
   DW1000.setPreambleCode(DW1000.PREAMBLE_CODE_16MHZ_2);
   DW1000.enableLedBlinking();
   DW1000.commitConfiguration();
@@ -195,7 +134,7 @@ void startTx() {
 
 void transmitPong() {
   prepareTx();
-  txBuffer[0] = FTYPE_PONG;
+  txBuffer[9] = 0x80;
   SET_SRC(txBuffer, anchorId, ADDR_SIZE);
   SET_DST(txBuffer, sender, ADDR_SIZE);
   startTx();
@@ -204,8 +143,13 @@ void transmitPong() {
 void transmitPollAck() {
   prepareTx();
   txBuffer[9] = TOA_POLLACK;
-  SET_SRC(txBuffer, anchorId, ADDR_SIZE);
-  SET_DST(txBuffer, tagCounterPart, ADDR_SIZE);
+  // SET_SRC(txBuffer, anchorId, ADDR_SIZE);
+  // SET_DST(txBuffer, tagCounterPart, ADDR_SIZE);
+  txBuffer[DESTADD] = rxBuffer[SOURADD];
+  txBuffer[DESTADD+1] = rxBuffer[SOURADD+1];
+  txBuffer[SOURADD] = (uint8_t)(anchorId);
+  txBuffer[SOURADD+1] = (uint8_t)(anchorId>>8);
+
   DW1000.setDelay(reply_delay);
   startTx();
 }
@@ -213,8 +157,14 @@ void transmitPollAck() {
 void transmitRangeReport() {
   prepareTx();
   txBuffer[9] = TOA_RANGEACK;
-  SET_SRC(txBuffer, anchorId, ADDR_SIZE);
-  SET_DST(txBuffer, tagCounterPart, ADDR_SIZE);
+  // SET_SRC(txBuffer, anchorId, ADDR_SIZE);
+  // SET_DST(txBuffer, tagCounterPart, ADDR_SIZE);
+
+  txBuffer[DESTADD] = rxBuffer[SOURADD];
+  txBuffer[DESTADD+1] = rxBuffer[SOURADD+1];
+  txBuffer[SOURADD] = (uint8_t)(anchorId);
+  txBuffer[SOURADD+1] = (uint8_t)(anchorId>>8);
+
   timePollReceived.getTimestamp(txBuffer + 5);
   timePollAckSent.getTimestamp(txBuffer + 10);
   timeRangeReceived.getTimestamp(txBuffer + 15);
@@ -262,6 +212,8 @@ void loop() {
   // Arduino didn't capture SPI tx/rx interrupts for more than RESET_TIMEOUT_MS
   if (!sentFrame && !receivedFrame && curMillis - lastActivity > RESET_TIMEOUT_MS) {
     PRINTLN(F("Seems transceiver not working. Re-init it."));
+    transmitPong();
+    PRINTLN(F("Sent pong"));
     initDW1000Receiver();
     return;
   }
@@ -304,12 +256,6 @@ void loop() {
     PRINTLN(rxBuffer[0]);
     PRINTLN(rxBuffer[9]);
 
-    if(state == STATE_IDLE){
-      if(rxBuffer[0] == TOATYPE_START){
-        PRINTLN(F(" received toa"));
-      }
-    }
-
     if (state == STATE_IDLE) {
       PRINTLN(F("  State: IDLE"));
       if (rxBuffer[9] == TOA_POLL) {
@@ -329,10 +275,10 @@ void loop() {
 
     if (state == STATE_RANGE) {
       PRINTLN(F("  State: RANGE"));
-      // if (rxBuffer[0] != TOA_RANGE) {
-      //   PRINTLN(F("    Not RANGE"));
-      //   return;
-      // }
+      if (rxBuffer[9] != TOA_RANGE) {
+        PRINTLN(F("    Not RANGE"));
+        return;
+      }
       // if (!DOES_SRC_MATCH(rxBuffer, tagCounterPart, ADDR_SIZE)) {
       //   PRINTLN(F("    Not from counter part"));
       //   return;

@@ -82,7 +82,7 @@ static dwt_config_t config = {
 uint16 Acaddrtable[QUANTITY_ANCHOR]={0x01,0x02,0x03,0x04,0x05};
 sys_config_t sys_config = {
 	.rangingtype=0,	/* 0 --> TOA , 1 --> TDOA */
-	.timebase=0,	/* 1 --> use timebase */
+	.timebase=1,	/* 1 --> use timebase */
 	.mpu_use=0,		/* 1 --> use mpu */
 	.pmpudata=NULL,
 	.mpudatacnt=200,//200*float
@@ -213,8 +213,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 //	IWDG_init(40000);
 //	IWDG_Feed();
-	Delay_ms(1000);
-	
 	tim14_int=0;
 	
 	while(1)
@@ -681,8 +679,8 @@ static int dw1000_init(void)
   dwt_settxantennadelay(TX_ANT_DLY);
 	decamutexoff(stat) ;
 	//dw_setARER(1);//使能接收机自动重启
-//	dwt_enableautoack(5);//使能自动应答
-//	dwt_enableframefilter(DWT_FF_DATA_EN|DWT_FF_ACK_EN);//使能帧过滤
+	dwt_enableautoack(5);//使能自动应答
+	dwt_enableframefilter(DWT_FF_DATA_EN|DWT_FF_ACK_EN);//使能帧过滤
 	
 	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS|SYS_STATUS_RXFCG|SYS_STATUS_SLP2INIT);//清除标志位
 	dwt_setinterrupt(0xffff,0);//关闭中断
