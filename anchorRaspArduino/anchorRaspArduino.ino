@@ -93,12 +93,14 @@ void setupDW1000() {
   DW1000.setDefaults();
   DW1000.setNetworkId(networkId);
   DW1000.setDeviceAddress(anchorId);
-  DW1000.enableMode(DW1000.MODE_SHORTDATA_FAST_LOWPOWER);
+  DW1000.enableMode(DW1000.MODE_SHORTDATA_FAST_LOWPOWER);  
   DW1000.setChannel(DW1000.CHANNEL_1);
   DW1000.setEUI(eui);
   // DW1000.setFrameFilter(true);
   // DW1000.setFrameFilterAllowData(true);
   // DW1000.setFrameFilterAllowAcknowledgement(true);
+  DW1000.setReceiverAutoReenable(false);
+
   DW1000.setPreambleCode(DW1000.PREAMBLE_CODE_16MHZ_2);
   DW1000.enableLedBlinking();
   DW1000.commitConfiguration();
@@ -214,7 +216,7 @@ void loop() {
     PRINTLN(F("Seems transceiver not working. Re-init it."));
     transmitPong();
     PRINTLN(F("Sent pong"));
-    initDW1000Receiver();
+    // initDW1000Receiver();
     return;
   }
 
