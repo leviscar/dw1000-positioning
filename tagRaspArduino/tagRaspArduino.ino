@@ -214,8 +214,8 @@ void loop() {
   // Arduino didn't capture SPI tx/rx interrupts for more than RESET_TIMEOUT_MS
   if (!sentFrame && !receivedFrame && curMillis - lastActivity > RESET_TIMEOUT_MS) {
     // PRINTLN(F("Seems transceiver not working. Re-init it."));
-    transmitPing();
-    PRINTLN(F("Sent Ping"));
+    // transmitPing();
+    // PRINTLN(F("Sent Ping"));
     return;
   }
 
