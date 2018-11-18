@@ -78,6 +78,10 @@ void spiSendEvent() {
   sentFrame = true;
 }
 
+void testSendEvent(){
+
+}
+
 void initDW1000Receiver() {
   DW1000.newReceive();
   DW1000.setDefaults();
@@ -124,7 +128,8 @@ void setupDW1000() {
 
 void prepareTx() {
   DW1000.newTransmit();
-  DW1000.setDefaults();
+  // setupDW1000();
+  // DW1000.setDefaults();
 }
 
 void startTx() {
@@ -137,8 +142,8 @@ void startTx() {
 void transmitPong() {
   prepareTx();
   txBuffer[9] = 0x80;
-  SET_SRC(txBuffer, anchorId, ADDR_SIZE);
-  SET_DST(txBuffer, sender, ADDR_SIZE);
+  // SET_SRC(txBuffer, anchorId, ADDR_SIZE);
+  // SET_DST(txBuffer, sender, ADDR_SIZE);
   startTx();
 }
 
@@ -213,37 +218,42 @@ void loop() {
   }
   // Arduino didn't capture SPI tx/rx interrupts for more than RESET_TIMEOUT_MS
   if (!sentFrame && !receivedFrame && curMillis - lastActivity > RESET_TIMEOUT_MS) {
-    PRINTLN(F("Seems transceiver not working. Re-init it."));
     transmitPong();
     PRINTLN(F("Sent pong"));
-    // initDW1000Receiver();
     return;
+  }
+
+  if(sentFrame){
+    PRINTLN(F("Sent something"));
+    sentFrame = false;
+    noteActivity();
+    lastSent = lastActivity;
   }
 
   // SPI tx interrupt is captured
   // Update some time variables, state
   // Extract DW1000 high-precision time value if needed
-  if (sentFrame) {
-    PRINTLN(F("Sent something"));
-    sentFrame = false;
-    noteActivity();
-    lastSent = lastActivity;
+  // if (sentFrame) {
+  //   PRINTLN(F("Sent something"));
+  //   sentFrame = false;
+  //   noteActivity();
+  //   lastSent = lastActivity;
 
-    if (state == STATE_PENDING_PONG && txBuffer[0] == FTYPE_PONG) {
-      PRINTLN(F("  Pending PONG sent. Return to IDLE"));
-      updateState(STATE_IDLE);
-      return;
-    }
+  //   if (state == STATE_PENDING_PONG && txBuffer[0] == FTYPE_PONG) {
+  //     PRINTLN(F("  Pending PONG sent. Return to IDLE"));
+  //     updateState(STATE_IDLE);
+  //     return;
+  //   }
 
-    if (txBuffer[9] == TOA_POLLACK) {
-      PRINTLN(F("  POLLACK sent. Getting timestamp..."));
-      DW1000.getTransmitTimestamp(timePollAckSent);
-    }
+  //   if (txBuffer[9] == TOA_POLLACK) {
+  //     PRINTLN(F("  POLLACK sent. Getting timestamp..."));
+  //     DW1000.getTransmitTimestamp(timePollAckSent);
+  //   }
 
-    if (txBuffer[9] == TOA_RANGEACK) {
-      PRINTLN(F("  RANGEREPORT sent"));
-    }
-  }
+  //   if (txBuffer[9] == TOA_RANGEACK) {
+  //     PRINTLN(F("  RANGEREPORT sent"));
+  //   }
+  // }
 
   // SPI rx interrupt is captured
   //  Update some time variables, state
