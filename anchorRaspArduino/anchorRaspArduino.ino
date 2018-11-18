@@ -96,13 +96,8 @@ void setupDW1000() {
   DW1000.enableMode(DW1000.MODE_SHORTDATA_FAST_LOWPOWER);  
   DW1000.setChannel(DW1000.CHANNEL_1);
   DW1000.setEUI(eui);
-  // DW1000.setFrameFilter(true);
-  // DW1000.setFrameFilterAllowData(true);
-  // DW1000.setFrameFilterAllowAcknowledgement(true);
-  DW1000.setReceiverAutoReenable(false);
 
   DW1000.setPreambleCode(DW1000.PREAMBLE_CODE_16MHZ_2);
-  DW1000.enableLedBlinking();
   DW1000.commitConfiguration();
 
   // test
@@ -119,7 +114,7 @@ void setupDW1000() {
   DW1000.attachSentHandler(spiSendEvent);
   DW1000.attachReceivedHandler(spiReceiveEvent);
 
-  initDW1000Receiver();
+  // initDW1000Receiver();
 }
 
 void prepareTx() {
@@ -133,12 +128,17 @@ void startTx() {
   // timeout will be asserted after tx interrupt
   lastSent = 0;
 }
+void transmitPing() {
+  prepareTx();
+  txBuffer[9] = 0x80;
+  SET_SRC(txBuffer, anchorId, ADDR_SIZE);
+  startTx();
+}
 
 void transmitPong() {
   prepareTx();
   txBuffer[9] = 0x80;
   SET_SRC(txBuffer, anchorId, ADDR_SIZE);
-  SET_DST(txBuffer, sender, ADDR_SIZE);
   startTx();
 }
 
@@ -213,10 +213,9 @@ void loop() {
   }
   // Arduino didn't capture SPI tx/rx interrupts for more than RESET_TIMEOUT_MS
   if (!sentFrame && !receivedFrame && curMillis - lastActivity > RESET_TIMEOUT_MS) {
-    PRINTLN(F("Seems transceiver not working. Re-init it."));
-    transmitPong();
-    PRINTLN(F("Sent pong"));
-    // initDW1000Receiver();
+    // PRINTLN(F("Seems transceiver not working. Re-init it."));
+    transmitPing();
+    PRINTLN(F("Sent Ping"));
     return;
   }
 
@@ -228,21 +227,6 @@ void loop() {
     sentFrame = false;
     noteActivity();
     lastSent = lastActivity;
-
-    if (state == STATE_PENDING_PONG && txBuffer[0] == FTYPE_PONG) {
-      PRINTLN(F("  Pending PONG sent. Return to IDLE"));
-      updateState(STATE_IDLE);
-      return;
-    }
-
-    if (txBuffer[9] == TOA_POLLACK) {
-      PRINTLN(F("  POLLACK sent. Getting timestamp..."));
-      DW1000.getTransmitTimestamp(timePollAckSent);
-    }
-
-    if (txBuffer[9] == TOA_RANGEACK) {
-      PRINTLN(F("  RANGEREPORT sent"));
-    }
   }
 
   // SPI rx interrupt is captured
@@ -262,34 +246,8 @@ void loop() {
       PRINTLN(F("  State: IDLE"));
       if (rxBuffer[9] == TOA_POLL) {
         PRINTLN(F("    Received POLL"));
-        // if (!DOES_DST_MATCH(rxBuffer, anchorId, ADDR_SIZE)) {
-        //   PRINTLN(F("      Not for me"));
-        //   return;
-        // }
-        PRINTLN(F("      Reply with POLLACK"));
-        DW1000.getReceiveTimestamp(timePollReceived);
-        tagCounterPart = sender;
-        transmitPollAck();
-        updateState(STATE_RANGE);
         return;
       }
-    }
-
-    if (state == STATE_RANGE) {
-      PRINTLN(F("  State: RANGE"));
-      if (rxBuffer[9] != TOA_RANGE) {
-        PRINTLN(F("    Not RANGE"));
-        return;
-      }
-      // if (!DOES_SRC_MATCH(rxBuffer, tagCounterPart, ADDR_SIZE)) {
-      //   PRINTLN(F("    Not from counter part"));
-      //   return;
-      // }
-      PRINTLN(F("    Sending RANGEREPORT..."));
-      DW1000.getReceiveTimestamp(timeRangeReceived);
-      transmitRangeReport();
-      updateState(STATE_IDLE);
-      return;
     }
   }
 }
