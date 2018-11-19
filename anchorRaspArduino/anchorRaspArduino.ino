@@ -80,7 +80,7 @@ void spiSendEvent() {
 
 void initDW1000Receiver() {
   DW1000.newReceive();
-  // DW1000.setDefaults();
+  DW1000.setDefaults();
   DW1000.receivePermanently(true);
   DW1000.startReceive();
   noteActivity();
@@ -119,7 +119,7 @@ void setupDW1000() {
 
 void prepareTx() {
   DW1000.newTransmit();
-  // DW1000.setDefaults();
+  DW1000.setDefaults();
 }
 
 void startTx() {
