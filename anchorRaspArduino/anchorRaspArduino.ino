@@ -91,11 +91,11 @@ void setupDW1000() {
   DW1000.select(PIN_SS);
   DW1000.newConfiguration();
   DW1000.setDefaults();
-  DW1000.setNetworkId(networkId);
-  DW1000.setDeviceAddress(anchorId);
+  // DW1000.setNetworkId(networkId);
+  // DW1000.setDeviceAddress(anchorId);
   DW1000.enableMode(DW1000.MODE_SHORTDATA_FAST_LOWPOWER);  
   DW1000.setChannel(DW1000.CHANNEL_1);
-  DW1000.setEUI(eui);
+  // DW1000.setEUI(eui);
 
   DW1000.setPreambleCode(DW1000.PREAMBLE_CODE_16MHZ_2);
   DW1000.commitConfiguration();
@@ -119,7 +119,7 @@ void setupDW1000() {
 
 void prepareTx() {
   DW1000.newTransmit();
-  DW1000.setDefaults();
+  // DW1000.setDefaults();
 }
 
 void startTx() {
@@ -131,7 +131,7 @@ void startTx() {
 void transmitPing() {
   prepareTx();
   txBuffer[9] = 0x80;
-  SET_SRC(txBuffer, anchorId, ADDR_SIZE);
+  // SET_SRC(txBuffer, anchorId, ADDR_SIZE);
   startTx();
 }
 
@@ -184,6 +184,13 @@ void setup() {
   // setupI2C();
   setupDW1000();
 
+  txBuffer[0] = 0x41;
+  txBuffer[1] = 0x88;
+  txBuffer[3] = 0xCA;
+  txBuffer[4] = 0xDE;
+  txBuffer[5] = 0xFF;
+  txBuffer[6] = 0xFF;
+
   PRINTLN(F("Setup finished"));
   PRINTLN(F("=============="));
   randomSeed(analogRead(0));
@@ -191,26 +198,6 @@ void setup() {
 
 void loop() {
   curMillis = millis();
-  // Safety watchdog to avoid stuck in PENDING_PONG state
-  // Sometimes SPI tx interrupt may not be captured by Arduino
-  if (state == STATE_PENDING_PONG
-      && curMillis - lastStateChange > PENDING_PONG_TIMEOUT_MS) {
-    PRINTLN(F("Seems Pending Pong lost. Return to IDLE"));
-    updateState(STATE_IDLE);
-  }
-  // Safety watchdog to avoid stuck in RANGE state
-  // 1. If SPI tx interrupt is captured (confirmed that POLLACK is sent)
-  // 2. If SPI tx interrupt is not captured for some reasons
-  if (state == STATE_RANGE
-      && ((lastSent && curMillis - lastSent > RANGE_TIMEOUT_MS)
-          || curMillis - lastStateChange > 2 * RANGE_TIMEOUT_MS)) {
-    /*
-     * Check RANGE message timeout when state is waiting for RANGE message
-     */
-    PRINTLN(F("RANGE timeout. Return to IDLE"));
-    updateState(STATE_IDLE);
-    return;
-  }
   // Arduino didn't capture SPI tx/rx interrupts for more than RESET_TIMEOUT_MS
   if (!sentFrame && !receivedFrame && curMillis - lastActivity > RESET_TIMEOUT_MS) {
     // PRINTLN(F("Seems transceiver not working. Re-init it."));
@@ -227,27 +214,5 @@ void loop() {
     sentFrame = false;
     noteActivity();
     lastSent = lastActivity;
-  }
-
-  // SPI rx interrupt is captured
-  //  Update some time variables, state
-  // Extract DW1000 high-precision time value if needed
-  if (receivedFrame) {
-    PRINTLN(F("Received something"));
-    receivedFrame = false;
-    noteActivity();
-    DW1000.getData(rxBuffer, FRAME_LEN);
-    GET_SRC(rxBuffer, sender, ADDR_SIZE);
-
-    PRINTLN(rxBuffer[0]);
-    PRINTLN(rxBuffer[9]);
-
-    if (state == STATE_IDLE) {
-      PRINTLN(F("  State: IDLE"));
-      if (rxBuffer[9] == TOA_POLL) {
-        PRINTLN(F("    Received POLL"));
-        return;
-      }
-    }
   }
 }

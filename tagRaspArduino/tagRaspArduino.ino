@@ -240,6 +240,14 @@ void loop() {
     GET_SRC(rxBuffer, sender, ADDR_SIZE);
 
     PRINTLN(rxBuffer[0]);
+    PRINTLN(rxBuffer[1]);
+    PRINTLN(rxBuffer[2]);
+    PRINTLN(rxBuffer[3]);
+    PRINTLN(rxBuffer[4]);
+    PRINTLN(rxBuffer[5]);
+    PRINTLN(rxBuffer[6]);
+    PRINTLN(rxBuffer[7]);
+    PRINTLN(rxBuffer[8]);
     PRINTLN(rxBuffer[9]);
 
     if (state == STATE_IDLE) {
