@@ -67,15 +67,27 @@ RTC_HandleTypeDef hrtc;
 //    DWT_PHRMODE_STD, /* PHY header mode. */
 //    (1025 + 64 - 32) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 //};
+//static dwt_config_t config = {
+//    1,               /* Channel number. */
+//    DWT_PRF_16M,     /* Pulse repetition frequency. */
+//    DWT_PLEN_128,   /* Preamble length. Used in TX only. */
+//    DWT_PAC8,       /* Preamble acquisition chunk size. Used in RX only. */
+//    2,               /* TX preamble code. Used in TX only. */
+//    2,               /* RX preamble code. Used in RX only. */
+//    0,               /* 0 to use standard SFD, 1 to use non-standard SFD. */
+//    DWT_BR_6M8,     /* Data rate. */
+//    DWT_PHRMODE_STD, /* PHY header mode. */
+//    (129 + 8 - 8) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
+//};
 static dwt_config_t config = {
-    1,               /* Channel number. */
+    5,               /* Channel number. */
     DWT_PRF_16M,     /* Pulse repetition frequency. */
-    DWT_PLEN_128,   /* Preamble length. Used in TX only. */
+    DWT_PLEN_2048,   /* Preamble length. Used in TX only. */
     DWT_PAC8,       /* Preamble acquisition chunk size. Used in RX only. */
-    2,               /* TX preamble code. Used in TX only. */
-    2,               /* RX preamble code. Used in RX only. */
+    4,               /* TX preamble code. Used in TX only. */
+    4,               /* RX preamble code. Used in RX only. */
     0,               /* 0 to use standard SFD, 1 to use non-standard SFD. */
-    DWT_BR_6M8,     /* Data rate. */
+    DWT_BR_110K,     /* Data rate. */
     DWT_PHRMODE_STD, /* PHY header mode. */
     (129 + 8 - 8) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
@@ -129,7 +141,7 @@ static void TOAprocess(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-static uint16 pan_id = 0xDECA;
+static uint16 pan_id = 10;
 static uint8 eui[] = {'A', 'C', 'K', 'D', 'A', 'T', 'R', 'X'};
 
 
@@ -217,18 +229,18 @@ int main(void)
 	
 	tim14_int=0;
 	
-	while(1)
-	{
-		dwt_setrxtimeout(0);
-		dwt_rxenable(DWT_START_RX_IMMEDIATE);	
-		while(!isframe_rec){};
-		isframe_rec=0;
-		if(rx_buffer[FUNCODE_IDX]==0x80)
-		{
-			printf("rec \r\n");
-		}
-		rx_buffer[FUNCODE_IDX]=0;
-	}
+//	while(1)
+//	{
+//		dwt_setrxtimeout(0);
+//		dwt_rxenable(DWT_START_RX_IMMEDIATE);	
+//		while(!isframe_rec){};
+//		isframe_rec=0;
+//		if(rx_buffer[FUNCODE_IDX]==0x80)
+//		{
+//			printf("rec \r\n");
+//		}
+//		rx_buffer[FUNCODE_IDX]=0;
+//	}
 
 	while(1)
 	{
@@ -671,7 +683,7 @@ static int dw1000_init(void)
 	stat = decamutexon();// care should be taken that the spi should never use interrupt cause the interrupts are disabled.
 	dwt_configure(&config);
 	dwt_setpanid(pan_id);
-  dwt_seteui(eui);
+//  dwt_seteui(eui);
   dwt_setaddress16(sys_config.id);
 	dwt_setleds(DWT_LEDS_ENABLE);//set the led
 
