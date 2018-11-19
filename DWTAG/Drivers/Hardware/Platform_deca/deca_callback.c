@@ -53,11 +53,12 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
 			}
 
 			dwt_readrxdata(rx_buffer, frame_len, 0);
-			if(!memcmp(lastmesg,rx_buffer,10))
-			{
-				dwt_rxenable(DWT_START_RX_IMMEDIATE);
-				return;
-			}
+			// 注意此处对比，一次rec总是因为这段语句，发送相同的东西会只会收到一次
+//			if(!memcmp(lastmesg,rx_buffer,10))
+//			{
+//				dwt_rxenable(DWT_START_RX_IMMEDIATE);
+//				return;
+//			}
 			memcpy(lastmesg,rx_buffer,10);
 			isframe_rec=1;
 		}
